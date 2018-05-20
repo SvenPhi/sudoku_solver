@@ -1,2 +1,3 @@
 # sudoku_solver
-simple program for solving sudoko
+
+In this branch I am developing a simple sudoku solver to learn python. Have fun using the script.

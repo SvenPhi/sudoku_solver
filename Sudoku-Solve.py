@@ -1,7 +1,96 @@
-"""Dieses Programm kan Sudoku lösen.
+﻿"""This program can solve Sudoku puzzles. Enter the numbers given and the
+algorithm will solve the Sudoku.
 
-Die Struktur ist wie folgt aufgebaut: Das Brett besteht aus n*n*n Gruppen. Zum Beispiel aus 9 Reihen,
-9 Zeilen und 9 Blöcken. Jede Gruppe enthält n Felder mit den möglichen Werten 1,...,n."""
+Everything works by logic, so no ugly brute force approaches."""
+
+#Define classes for each part of the sudoku
+class Field:
+    """This class refers to the basic unit of the sudoku puzzle, the field in
+    which a number between 1 and 9 is placed.
+    
+    It takes the argument max_digit, which is the biggest digit in the
+    sudoku. Usually this is 9, but some games have only 6 digit."""
+    
+    def __init__(self, max_digit = 9, known_value = 0):
+        self.digit = 0
+        self.possibilities = range(1, max_digit + 1)
+        self.solved = False
+        
+        if known_value != 0: #Then the field is known.
+            self.set_value(known_value)
+            
+            
+    def set_value(self, value):
+        """In case a value is known set_value() sets the field to this value
+        and marks the field as a known field."""
+        self.digit = value
+        self.possibilities = list() #empty list
+        self.solved = True
+        
+
+class Group:
+    """All fields are grouped in rows, columns or blocks. This class is used to
+    form such groups, being intialized with each sudoku board."""
+    
+    def __init__(self, group_fields, max_digit):
+        """The argument group_fields is a list of fields that belong to the
+        group."""
+        self.fields = group_fields
+        self.unknown_digits = range(1, max_digit + 1)
+        self.digits_known = list() #empty list
+        
+    def check_known_values(self):
+        """The method check_known_values looks for fields that are known and
+        deletes these known digits from the possible digits of all other
+        fields in the group."""
+        for f in self.fields: #Check for every field
+            if f.solved: #whether the field is known
+                
+                
+        
+
+
+class Puzzle:
+    """This class defines the board on which the sudoku is played. Two versions
+    of the board can be played: the standard version with 9 digits and the easy
+    version with 6 digits."""
+    
+    def __init__(self, max_digit = 9):
+        """This initializes the sudoku board. There are two options:
+        - in case of 9 digits a 9x9 board,
+        - in case of 6 digits a 6x9 board."""        
+        self.board = list() #Define the board
+        if max_digit in (6,9):
+            for row in range(max_digit): #make the right number of rows
+                fields = list()
+                for index in range(9): #with 9 fields in each row.
+                    fields.append(Field(max_digit = 9)) #[Field()]*9 would creat a list of the same field, therefore it is per element.
+                self.board.append(fields)
+        else:
+            print('Error, wrong number of digits: {0}! A sudoku game must have 6 or 9 digits.'.format(max_digit))
+
+    def show_board(self):
+        for rows in range(self.board.__len__()):
+            print('-------------------------------------')
+            print_str = '|'
+            for fields in self.board[rows]:
+                print_str += ' {0} |'.format(fields.digit)
+            print(print_str)
+        print('-------------------------------------')
+        
+
+
+def __main__():
+    super_die_hard_sudoku = Puzzle(9)
+    super_die_hard_sudoku.board[1][1].set_value(7)    
+    
+    super_die_hard_sudoku.show_board()
+        
+__main__()
+
+
+
+#======= Here starts the uselsss, old code==============================
 
 def powerset(set):
     laenge = len(set)

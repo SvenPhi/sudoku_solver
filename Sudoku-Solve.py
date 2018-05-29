@@ -108,14 +108,10 @@ class Group:
         """The argument group_fields is a list of fields that belong to the
         group."""
         self.fields = group_fields
-        self.unknown_digits = range(1, max_digit + 1)
-        self.digits_known = list() #empty list
         for f in self.fields:
             f.add_group(self)
         
     def __repr__():
-        print('The unknown digits are:')
-        print(self.unknown_digits)
         print('The fields are:')
         for f in self.fields:
             f.__repr__()
@@ -137,7 +133,31 @@ class Group:
                     operations += f_u.remove_possibility(field_to_chk.digit)
         
         return operations
-            
+        
+    def naked_siblings(self):
+        """This method is the generalization of the naked twins method: If
+        there are n fields that can take exclusively only n of the same values,
+        than all other fields cannot take these values."""
+        print('Try naked siblings...')
+        operations = 0
+        
+        for n in range (2,5): #1 is the trivial case, higher than 4 is equivalent to cases with lower n.
+            for f in self.fields:
+                if f.possibilities.__len__() == n: #Look for fields with exactly n possible values.
+                    siblings = [f]
+                    for f_other in self.fields: #If the fields differ, but their possibilities are the same, than these are siblings.
+                        if (f_other != f) and (f_other.possibilities == f.possibilities):
+                            siblings.append(f_other)
+                
+                    if siblings.__len__() == n: #check whether it's really n,
+                        for f_rest in self.fields:
+                            if f_rest not in siblings:
+                                for p in f.possibilities:
+                                    operations += f_rest.remove_possibility(p)
+                    elif siblings.__len__() > n: #otherwise it's an error.
+                        print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
+        return operations
+                
 
 class Puzzle:
     """This class defines the board on which the sudoku is played. Two versions
@@ -196,14 +216,31 @@ class Puzzle:
         print('The puzzle has been set up.')
 
 
-    def __repr__(self):
+    def __repr__(self, missing = False):
         for rows in range(self.board.__len__()):
-            print('-------------------------------------')
+            if rows % 3 == 0:
+                print('=====================================')
+            else:    
+                print('-------------------------------------')
             print_str = '|'
             for fields in self.board[rows]:
                 print_str += ' {0} |'.format(fields.digit)
             print(print_str)
-        print('-------------------------------------')
+        print('=====================================')
+        
+        if missing:
+            row_num = 0
+            output_str = '\nThe missing fields have the possibilities:\n\n'
+            for row_of_fields in self.board:
+                row_num += 1
+                for f in row_of_fields:
+                    if not f.solved:
+                        output_str += '{0} - ( '.format(row_num)
+                        for p in f.possibilities:
+                            output_str += '{0}, '.format(p)
+                        output_str += ')\n'
+            print(output_str)
+                
         
     def solve(self):
         """The method solve() initiates the next iteration of the solution of
@@ -214,7 +251,30 @@ class Puzzle:
         for grp in self.groups:
             operations += grp.check_known_values()
         
+        if operations == 0:
+            for grp in self.groups:
+                operations += grp.naked_siblings()
+                
         return operations
+
+    def check_solved(self):
+        """This method checks whether the sudoku has been solved."""
+        puzzle_solved = True
+        
+        for row_of_fields in self.board:
+            for fld in row_of_fields:
+                if not fld.solved:
+                    puzzle_solved = fld.solved
+                    break
+                    break
+        return puzzle_solved
+    
+    def brute_force(self):
+        """Some puzzles are really hard. In this case we just brute force the
+        solution."""
+        print('#### !!!!! BRUTE FORCE HAS BEEN APPLIED !!!!! ####')
+              
+        
 
 def write_down_puzzle():
     """This function ask to fill in a sudoku and is returning the input as list
@@ -257,27 +317,27 @@ def __main__():
 #                     [0,0,0,0,9,0,2,0,6],
 #                     [0,4,2,8,0,0,0,0,7]]
     
-    sudoku_puzzle = [[1,0,3,8,0,5,7,0,6],
-                     [0,2,0,0,4,0,0,1,0],
-                     [7,0,0,0,0,1,0,0,9],
-                     [8,0,2,0,0,0,0,0,7],
-                     [0,6,0,0,0,0,0,9,0],
-                     [5,0,0,0,0,0,3,0,8],
-                     [6,0,0,4,0,0,0,0,5],
-                     [0,1,0,0,8,0,0,3,0],
-                     [3,0,4,6,0,7,9,0,1]]
+#    sudoku_puzzle = [[1,0,3,8,0,5,7,0,6],
+#                     [0,2,0,0,4,0,0,1,0],
+#                     [7,0,0,0,0,1,0,0,9],
+#                     [8,0,2,0,0,0,0,0,7],
+#                     [0,6,0,0,0,0,0,9,0],
+#                     [5,0,0,0,0,0,3,0,8],
+#                     [6,0,0,4,0,0,0,0,5],
+#                     [0,1,0,0,8,0,0,3,0],
+#                     [3,0,4,6,0,7,9,0,1]]
  
 
     #hard:
-#    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
-#                     [1,0,0,3,0,7,9,0,6],
-#                     [0,9,0,0,0,0,0,0,0],
-#                     [0,4,0,0,0,0,0,1,0],
-#                     [7,0,0,0,8,0,0,0,2],
-#                     [0,5,0,0,0,0,0,9,0],
-#                     [0,0,0,0,0,0,0,2,0],
-#                     [3,0,5,2,0,9,0,0,0],
-#                     [0,6,0,0,0,1,0,8,0]]
+    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
+                     [1,0,0,3,0,7,9,0,6],
+                     [0,9,0,0,0,0,0,0,0],
+                     [0,4,0,0,0,0,0,1,0],
+                     [7,0,0,0,8,0,0,0,2],
+                     [0,5,0,0,0,0,0,9,0],
+                     [0,0,0,0,0,0,0,2,0],
+                     [3,0,5,2,0,9,0,0,0],
+                     [0,6,0,0,0,1,0,8,0]]
     
     super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
     super_die_hard_sudoku.__repr__()
@@ -288,8 +348,16 @@ def __main__():
         operations = super_die_hard_sudoku.solve()
         print('{0} operations performed'.format(operations))
     
-    super_die_hard_sudoku.__repr__()
+    if not super_die_hard_sudoku.check_solved():
+        super_die_hard_sudoku.brute_force()
     
+    super_die_hard_sudoku.__repr__(missing = True)
+    
+    if super_die_hard_sudoku.check_solved():
+        print('The puzzle has been solved!')
+    else:
+        print('The puzzle has not been solved. What a sad day...')
+        
 __main__()
 
 

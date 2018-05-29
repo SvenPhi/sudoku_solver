@@ -1,7 +1,23 @@
 ﻿"""This program can solve Sudoku puzzles. Enter the numbers given and the
 algorithm will solve the Sudoku.
 
-Everything works by logic, so no ugly brute force approaches."""
+The algorithm is an optimistic berserc:
+    (1) Try to solve the sudoku by logic, if this does not work
+    (2) brute force it.
+
+Somehow the algorithm must know whether some conclusions have been made in one
+logical iteration. Therefore every function that fills in numbers returns the
+number of operations performed.
+
+The algorithm solves the puzzle as follows:
+    First, for each group, go through all fielda and check whether some
+        potential values are already taken by another field in the group. If
+        so, remove that value form the list of possible values.
+    Second, if a value can be removed, check whether there is only possible
+        value left; if this is the case, set the field to that value. Jump back
+        to the first step to check for the consequences for the rest of the
+        group.
+"""
 
 #Define classes for each part of the sudoku
 class Field:
@@ -13,13 +29,31 @@ class Field:
     
     def __init__(self, max_digit = 9, known_value = 0):
         self.digit = 0
-        self.possibilities = range(1, max_digit + 1)
+        self.possibilities = [x for x in range(1, max_digit + 1)]
         self.solved = False
+        #Define the group-register to which the field belongs:
+        self.groups = list() 
         
         if known_value != 0: #Then the field is known.
             self.set_value(known_value)
             
-            
+    def __repr__(self):
+        """__repr__ shows all relevant values of the field."""
+        print('The field belongs to {0} groups:'.format(self.groups.__len__()))
+        if self.solved:
+            return print('it is solved, its value is {0}.'.format(self.digit))
+        else:
+            unsolved_str = 'it is unsolved, its possible values are ('
+            for v in self.possibilities:
+                unsolved_str +=' {0} '.format(v)
+            unsolved_str += ').'
+            print(unsolved_str)
+    
+    def add_group(self, group_address):
+        """The method add_group simply adds a group to the group register of
+        the field."""
+        self.groups.append(group_address)    
+        
     def set_value(self, value):
         """In case a value is known set_value() sets the field to this value
         and marks the field as a known field."""
@@ -27,6 +61,44 @@ class Field:
         self.possibilities = list() #empty list
         self.solved = True
         
+    
+    def fill_check(self):
+        """The method fill_check checks whether there is only one possible
+        value left, setting the field to this value if true."""
+        if (self.possibilities.__len__() == 1) and (not self.solved):
+            #If there is only one possibility left, than set this one as value,
+            self.digit = self.possibilities.pop() #returns the last value of the list and empties the list
+            self.solved = True
+            operations = 1 #omdat 1 actie is uitgevoerd
+            
+            #and check for the consequences in the rest of the group.
+            operations += self.check_in_groups()
+
+            return operations 
+        else:
+            return 0
+            #raise ValueError('field-error: Inconsistency: {0} possible values and solved-bool is {1}.'.format(self.possibilities.__len__(), self.solved))
+    
+    def remove_possibility(self, value):
+        """This method removes a value from the possibilities and checks whether
+        the field can filled in."""
+        if (not self.solved) and (self.possibilities.count(value) > 0):
+            self.possibilities.remove(value)
+            operations = self.fill_check()
+            return operations + 1 #+1 for the removal of the value
+        else:
+            return 0
+        
+    def check_in_groups(self):
+        """The check in groups method loops over all groups of the field to
+        check for the consequences of the field value for the rest of the
+        fields in the groups."""
+        operations = 0
+        for grp in self.groups:
+            operations += grp.check_known_values(self)
+            
+        return operations
+
 
 class Group:
     """All fields are grouped in rows, columns or blocks. This class is used to
@@ -38,38 +110,96 @@ class Group:
         self.fields = group_fields
         self.unknown_digits = range(1, max_digit + 1)
         self.digits_known = list() #empty list
+        for f in self.fields:
+            f.add_group(self)
         
-    def check_known_values(self):
+    def __repr__():
+        print('The unknown digits are:')
+        print(self.unknown_digits)
+        print('The fields are:')
+        for f in self.fields:
+            f.__repr__()
+    
+    def check_known_values(self, field_to_chk = None):
         """The method check_known_values looks for fields that are known and
         deletes these known digits from the possible digits of all other
         fields in the group."""
-        for f in self.fields: #Check for every field
-            if f.solved: #whether the field is known
-                
-                
+        operations = 0
         
-
+        if field_to_chk is None:
+            for f_s in self.fields: #Check for every field
+                if f_s.solved: #whether the field is known
+                    for f_u in self.fields:
+                        operations += f_u.remove_possibility(f_s.digit)
+        else: #field is given
+            if field_to_chk.solved:
+                for f_u in self.fields:
+                    operations += f_u.remove_possibility(field_to_chk.digit)
+        
+        return operations
+            
 
 class Puzzle:
     """This class defines the board on which the sudoku is played. Two versions
     of the board can be played: the standard version with 9 digits and the easy
     version with 6 digits."""
     
-    def __init__(self, max_digit = 9):
+    def __init__(self, max_digit = 9, initial_numbers = None):
         """This initializes the sudoku board. There are two options:
         - in case of 9 digits a 9x9 board,
         - in case of 6 digits a 6x9 board."""        
         self.board = list() #Define the board
+        
+        """On each board, the fields are grouped in rows, columns and blocks.
+        These groups are catched by just one list of the class Group."""
+        self.groups = list()
+        
+        if initial_numbers is not None: #Determine the size of the board.
+            max_digit = int(initial_numbers.__len__())
+        
         if max_digit in (6,9):
+            #Define the fields
             for row in range(max_digit): #make the right number of rows
                 fields = list()
-                for index in range(9): #with 9 fields in each row.
-                    fields.append(Field(max_digit = 9)) #[Field()]*9 would creat a list of the same field, therefore it is per element.
+                for col in range(max_digit): #for the number of columns
+                    fields.append(Field(max_digit = max_digit)) #[Field()]*9 would creat a list of the same field, therefore it is per element.
                 self.board.append(fields)
+                
+            #Sort the fields into groups
+            #First the rows,
+            for row_of_fields in self.board:
+                self.groups.append(Group(row_of_fields, max_digit = max_digit))
+            #second the columns,
+            for col in range(max_digit):
+                col_of_fields = list()
+                for row in range(max_digit):
+                    col_of_fields.append(self.board[row][col])
+                self.groups.append(Group(col_of_fields, max_digit = max_digit))
+            #third, and finally, the blocks.
+            puzzle_fac = int(max_digit / 3) #Deze factor is nodig om dat blocken bij 6er sudoku het formaat 2x3 hebben.
+            for block_row in range(puzzle_fac):
+                for block_col in range(3):
+                    block_of_fields = list()
+                    for row in range(block_row * 3, (block_row + 1) * 3):
+                        for col in range(block_col * puzzle_fac, (block_col + 1) * puzzle_fac):
+                            block_of_fields.append(self.board[row][col])
+                    self.groups.append(Group(block_of_fields, max_digit = max_digit))
         else:
             print('Error, wrong number of digits: {0}! A sudoku game must have 6 or 9 digits.'.format(max_digit))
+         
+        if initial_numbers is not None: #Set the values known:
+            for row in range(max_digit):
+                for col in range(max_digit):
+                    if initial_numbers[row][col] in range(1,10):
+                        print(row)
+                        print(col)
+                        print(initial_numbers[row][col])
+                        self.board[row][col].set_value(initial_numbers[row][col])
+            
+        print('The puzzle has been set up.')
 
-    def show_board(self):
+
+    def __repr__(self):
         for rows in range(self.board.__len__()):
             print('-------------------------------------')
             print_str = '|'
@@ -78,190 +208,72 @@ class Puzzle:
             print(print_str)
         print('-------------------------------------')
         
+    def solve(self):
+        """The method solve() initiates the next iteration of the solution of
+        the puzzle."""
+        
+        operations = 0
+        
+        for grp in self.groups:
+            operations += grp.check_known_values()
+        
+        return operations
 
+def write_down_puzzle():
+    """This function ask to fill in a sudoku and is returning the input as list
+    of n lists with n elements each. n is either 6 or 9, depending on the
+    sudoku at hand."""
+    print(('This function allows to fill in a sudoku easily. After your has '
+          'been made the puzzle will be solved automatically.\nLife can be so'
+          ' easy!\n\nPlease enter the sudoku row by row, pressing the Enter '
+          'button at the end of each row. Fill in the digits you know; enter a'
+          ' 0 for all fields that are left blank in your puzzle.'))
+    known_values = list()
+    
+    return known_values
 
 def __main__():
-    super_die_hard_sudoku = Puzzle(9)
-    super_die_hard_sudoku.board[1][1].set_value(7)    
     
-    super_die_hard_sudoku.show_board()
-        
+    sudoku_puzzle = [[0,0,1,5,0,9,4,0,2],
+                     [0,9,0,1,0,4,5,0,0],
+                     [3,5,0,0,0,8,0,9,0],
+                     [0,8,3,2,5,1,0,7,0],
+                     [0,2,9,7,0,0,3,4,0],
+                     [5,0,0,9,0,0,0,0,8],
+                     [0,0,0,0,6,0,0,5,0],
+                     [0,0,0,0,9,0,2,0,6],
+                     [0,4,2,8,0,0,0,0,7]]
+    
+    super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
+    super_die_hard_sudoku.__repr__()
+
+    operations = 1
+    
+    while operations > 0:
+        operations = super_die_hard_sudoku.solve()
+        print('{0} operations performed'.format(operations))
+    
+    super_die_hard_sudoku.__repr__()
+    
 __main__()
 
 
+"""Tests:
+
+    f_val = 1
+    for grp in super_die_hard_sudoku.row_groups:
+        for f in grp.fields:
+            f.set_value(f_val)
+        f_val += 1
+    
+    super_die_hard_sudoku.__repr__()    
+    
+"""
 
 #======= Here starts the uselsss, old code==============================
 
-def powerset(set):
-    laenge = len(set)
-    for index in range(1 << laenge):
-        print [s[j] for j in range(laenfe) if (index & (1 << j))]
-
-#Klassen
-class Feld:
-    """Die Objekte der Klasse <<Feld>> representieren die Felder auf einem Sudoku-Brett.
-    Bevor der Sudokolöser anfängt sind die möglichen Werte 1 bis 9. Danach haben sie einen
-    Wert. Jedes Feld gehört zu 3 <<Gruppen>>."""
-    bekannte_Felder = 0
-    unbekannte_Felder = 0
-
-    def __init__(self, input_wert, anzahl_moeglichkeiten, neue_gruppe):
-        self.wert = input_wert
-        self.gruppen = []
-        self.gruppen.append(neue_gruppe)
-        if input_wert == 0: # 0 steht für "unbekannt".
-            self.bekannt = False
-            Feld.unbekannte_Felder += 1
-            self.moeglichkeiten = [zahl+1 for zahl in range(anzahl_moeglichkeiten)]
-            # print(self.moeglichkeiten)
-        else:
-            self.bekannt = True
-            Feld.bekannte_Felder += 1
-            self.moeglichkeiten = []
-
-    def fuege_zu_gruppe(self, neue_gruppe):
-        self.gruppen.append(neue_gruppe)
-
-    def aender_wert(self, neuer_wert):
-        if neuer_wert > 0:
-            self.wert = neuer_wert
-            self.moeglichkeiten = []
-            self.bekannt = True
-            Feld.bekannte_Felder += 1
-            Feld.unbekannte_Felder -= 1
-        else:
-            print("Error: Falscher Wert!")
-
-    def zeige_wert(self):
-        return self.wert
-
-    def entferne_moeglichkeiten(self, input_moeglichkeiten = []):
-        zaehl_aenderungen = 0
-        if self.wert != 0:
-            for aktuelle_gruppe in self.gruppen:
-                for aktuelles_feld in aktuelle_gruppe.felder:
-                    if aktuelles_feld.moeglichkeiten.count(self.wert) > 0:
-                        aktuelles_feld.moeglichkeiten.remove(self.wert)
-                        zaehl_aenderungen += 1
-                        if (not aktuelles_feld.bekannt) and (aktuelles_feld.moeglichkeiten.__len__() == 1):
-                            zaehl_aenderungen += aktuelles_feld.setze_fest()
-                if aktuelle_gruppe.moeglichkeiten_der_gruppe.count(self.wert) > 0: #Auch für die ganze Gruppe muss deutlich werden, dass die Zahl nicht mehr zur Verfügung steht.
-                    aktuelle_gruppe.moeglichkeiten_der_gruppe.remove(self.wert)
-        else:
-            #if (not self.bekannt) and input_moeglichkeiten != []: #Dann werden feste Möglichkeiten für dieses Feld vorgegeben.
-            print("Hallo")    
-        return zaehl_aenderungen
-
-    def setze_fest(self, input_wert = 0):
-        zaehl_aenderungen = 0
-        if not self.bekannt:
-            if self.moeglichkeiten.__len__() == 1: # Dann ist deutlich was der Wert des Feldes ist, es kann als bekannt markiert werden.
-                self.wert = self.moeglichkeiten[0] #der letzte verbleibende wert
-                self.bekannt = True
-                Feld.bekannte_Felder += 1
-                Feld.unbekannte_Felder -= 1
-                zaehl_aenderungen += 1
-                zaehl_aenderungen += self.entferne_moeglichkeiten()
-            else: #D.h. __len__ > 1
-                if (input_wert != 0) and (not self.bekannt) and (input_wert != 0): #Dann wird ein Wert errzwungen, zum Beispiel wenn man ausschließen kann das andere Felder diesen Wert haben.
-                    self.moeglichkeiten = [input_wert]
-                    zaehl_aenderungen += self.setze_fest()
-        return zaehl_aenderungen
 
 
-class Gruppe:
-    """Die Felder eines jeden Sudoku-Bretts können in Gruppen aufgeteilt werden."""
-    def __init__(self, anzahl_felder = 0, neu = False):
-        self.felder = [] #definiere die Felder
-        self.max_anzahl = anzahl_felder
-        self.moeglichkeiten_der_gruppe = [zahl+1 for zahl in range(anzahl_felder)] #Hier wird mitgezählt welche Zahlen in der Gruppe noch möglich sind.
-        if neu:
-            for index in range(anzahl_felder):
-                self.felder.append(Feld(input_wert = 0, anzahl_moeglichkeiten = anzahl_felder, neue_gruppe = self))
-
-    def fuege_feld_zu(self, bestehendes_feld):
-        """Diese methode weist einer Gruppe bereits bestehende Felder zu."""
-        self.felder.append(bestehendes_feld) #Die Gruppe nimmt das Feld auf, ...
-        bestehendes_feld.fuege_zu_gruppe(neue_gruppe = self) #... das Feld merkt sich zu welcher Gruppe es gehört.
-
-    def suche_einsame_zahlen(self):
-        """Diese methode schaut ob es Zahlen gibt, die nur in einem Feld stehen können und setzt diese dann."""
-        zaehl_aenderungen = 0
-        for ziffer in self.moeglichkeiten_der_gruppe:
-            haeufigkeit_zahl = 0
-            relevante_felder = []
-            for aktuelles_feld in self.felder:
-                enthaelt_ziffer = aktuelles_feld.moeglichkeiten.count(ziffer) #0 falls nicht enthalten, 1 falls enthalten.
-                if enthaelt_ziffer > 0:
-                    haeufigkeit_zahl += enthaelt_ziffer
-                    relevante_felder.append(aktuelles_feld)
-            if haeufigkeit_zahl == 1: #Falles es das einzige Feld mit der Zahl ist, dan einsetzen:
-                for aktuelles_feld in relevante_felder:
-                    zaehl_aenderungen += aktuelles_feld.setze_fest(input_wert = ziffer)
-        return zaehl_aenderungen
-
-    def suche_zahlcluster(self):
-        """Diese Methode schaut ob es n Zahlen gibt die über genau n Felder einen geschlossen cluster bilden."""
-        zaehl_aenderungen = 0
-        for n in range(int(self.moeglichkeiten_der_gruppe.__len__)/2 + 1): # Es reicht um für Tupel der größe n/2 zu schauen, weil die anderen Feder dann automatisch einen Cluster bilden. Bekannte Zahelen zählen können ignoriert werden.
-            for index in range(1 << n):
-                ziffern_index = [j for j in range(n) if (index & (1 << j))]
-                count_felder = 0 #Zählt wie viele Felder das Tuper ziffern_index enthalten.
-                falsch_feld_liste = [] #merkt sich welche Fleder das Tupel nicht enthalten.
-                for feld in self.felder:
-                    tupel_enthalten = True
-                    for ziffer in ziffern_index:
-                        if feld.moeglichkeiten.count(ziffer) == 0: #Dann ist die Ziffer nicht auf dem Feld...
-                            tupel_enthalten = False
-                            break
-                    if tupel_enthalten:
-                        count_felder += 1
-                    else:
-                        falsch_feld_liste.append(feld)
-                if count_felder == n: #Dann gibt es tatsächlich so ein Tupel im Block. Die Ziffern aus diesem Tupel können auf allen anderen Feldern aus den Möglichkeiten gelöscht werden.
-                    for feld in falsch_feld_liste:
-                        for ziffer in ziffern_index:
-                            feld.moeglichkeiten.remove(ziffer)
-                            zaehl_aenderungen += 1        
-        return zaehl_aenderungen
-
-class Brett:
-    """Das Sudokubrett auf dem gespielt wird."""
-    def __init__(self, block_hoehe, block_breite):
-        self.block = [] #Alle Blockgruppen
-        self.reihe = [] #Alle Reigengruppen
-        self.spalte = [] #Alle Spaltengruppen
-        #Erst einmal alle Gruppen definieren. Nur die Blöcke kriegen Felder zugewiesen.
-        for index_h in range(block_hoehe):
-            for index_b in range(block_breite):
-                self.block.append(Gruppe(anzahl_felder = block_hoehe * block_breite, neu = True))
-                self.reihe.append(Gruppe())
-                self.spalte.append(Gruppe())
-        #Jetzt, im zweiten Schritt, werden auch der Reihengruppe und der Spaltengruppe Felder zugewiesen.
-        for block_index_breit in range(block_hoehe): #Es gibt immer so viele Blöcke in der Breite, wie jeder Block hoch ist.
-            for block_index_hoch in range(block_breite):
-                aktueller_block = self.block[block_index_hoch + block_breite * (block_index_breit)]
-                for feld_index_breit in range(block_breite): #Natürlich gibt es in jedem Block so viele Felder in der Breite, wie der Block breit ist.
-                    for feld_index_hoch in range(block_hoehe):
-                        aktuelles_feld = aktueller_block.felder[feld_index_breit + feld_index_hoch * block_hoehe]
-                        self.reihe[block_index_hoch * block_hoehe + feld_index_hoch].fuege_feld_zu(aktuelles_feld)
-                        self.spalte[block_index_breit * block_breite + feld_index_breit].fuege_feld_zu(aktuelles_feld)
-    def aender_feld(self, reihen_nummer, spalten_nummer,neuer_feldwert):
-        self.reihe[reihen_nummer-1].felder[spalten_nummer-1].aender_wert(neuer_wert = neuer_feldwert)
-    
-    def zeige_reihe(self, index_gruppe, index_feld):
-        return self.reihe[index_gruppe].felder[index_feld].wert
-    def zeige_moeglichkeiten_der_reihe(self, index_gruppe, index_feld):
-        return self.reihe[index_gruppe].felder[index_feld].moeglichkeiten
-    def zeige_spalte(self, index_gruppe, index_feld):
-        return self.spalte[index_gruppe].felder[index_feld].wert
-    def zeige_block(self, index_gruppe, index_feld):
-        return self.block[index_gruppe].felder[index_feld].wert
-
-def __initialize_sudoku__(hoch, breit):
-    """Diese Funktion initialisiert das Spielbrett"""
-    Spielbrett = Brett(hoch, breit)
-    
     #Sudoku 1
     # Spielbrett.aender_feld(1,1,1)
     # Spielbrett.aender_feld(1,3,3)
@@ -323,107 +335,3 @@ def __initialize_sudoku__(hoch, breit):
     Spielbrett.aender_feld(9,5,1)
     Spielbrett.aender_feld(9,8,8)
 
-
-    return Spielbrett
-
-def __test_sudoku__(Das_Brett, brett_hoehe, brett_breite):
-    """Diese Funktion zeigt das Brett über die verschiedenen Gruppen, um zu testen ob die Felder und die Gruppen gut gelinkt sind."""
-    for ind_h in range(brett_hoehe * brett_breite):
-        output_string = "|"
-        for ind_b in range(brett_hoehe * brett_breite):
-            output_string += " {0} |".format(Das_Brett.zeige_reihe(ind_h, ind_b))
-        output_string += " -- |"
-        for ind_b in range(brett_hoehe * brett_breite):
-            output_string += " {0} |".format(Das_Brett.zeige_spalte(ind_b, ind_h))
-        output_string += " -- |"
-        index_block = int(ind_h / brett_hoehe)
-        for block_switch in range(brett_hoehe):
-            for ind_b in range(brett_breite):
-                output_string += " {0} |".format(Das_Brett.zeige_block(index_block + brett_breite * block_switch,ind_b + (ind_h % brett_hoehe) * brett_breite))
-        print(output_string)
-
-def __test_moeglichkeiten__(Das_Brett, brett_hoehe, brett_breite):
-    for ind_h in range(brett_breite * brett_hoehe):
-        for ind_b in range(brett_hoehe * brett_breite):
-            print("{0} -> {1}".format(Das_Brett.zeige_reihe(ind_h, ind_b), Das_Brett.zeige_moeglichkeiten_der_reihe(ind_h, ind_b)))
-            
-
-def __show_sudoku__(Das_Brett, block_hoehe, block_breite):
-    """Diese Funktion zeigt das ganze Sudokuspiel."""
-    
-
-    for ind_h in range(block_hoehe * block_breite):
-        if ind_h % block_hoehe == 0:
-            output_string = "-"
-            for ind_b in range(block_hoehe * block_breite):
-                output_string += "----"
-            print(output_string)
-        output_string = "║"
-        for ind_b in range(block_hoehe * block_breite):
-            if ind_b % block_breite != 2:
-                output_string += " {0} |".format(Das_Brett.zeige_reihe(ind_h, ind_b))
-            else:
-                output_string += " {0} ║".format(Das_Brett.zeige_reihe(ind_h, ind_b))
-        print(output_string)
-    
-    output_string = "-"
-    for ind_h in range(block_hoehe * block_breite):
-        output_string += "----"
-    print(output_string)
-
-def __solve_sudoku__(Das_Brett):
-    aenderungen = 0 #Sofort auf 0 setzen, weil der Default ist, dass es keine Änderungen gibt und die Schleife dann stoppen muss.
-
-    for aktuelle_reihe in Das_Brett.reihe:
-        for aktuelles_feld in aktuelle_reihe.felder:
-            if aktuelles_feld.bekannt:
-                aenderungen += aktuelles_feld.entferne_moeglichkeiten()
-                
-    print("Deze beurt zijn er {0} acties uitgevoerd.".format(aenderungen))
-
-    while aenderungen > 0:
-        aenderungen = 0 #Sofort auf 0 setzen, weil der Default ist, dass es keine Änderungen gibt und die Schleife dann stoppen muss.
-
-        for aktuelle_reihe in Das_Brett.reihe:
-            for aktuelles_feld in aktuelle_reihe.felder:
-                if not aktuelles_feld.bekannt: #Das feld ist unbekannt, hier kann noch was passieren.
-                    if aktuelles_feld.moeglichkeiten.__len__() == 1:
-                        aenderungen = aktuelles_feld.setze_fest()
-            aenderungen += aktuelle_reihe.suche_einsame_zahlen()
-
-        for aktuelle_gruppe in Das_Brett.spalte:
-            aenderungen += aktuelle_gruppe.suche_einsame_zahlen()
-
-        for aktuelle_gruppe in Das_Brett.block:
-            aenderungen += aktuelle_gruppe.suche_einsame_zahlen()
-                    
-        print("Deze beurt zijn er {0} acties uitgevoerd.".format(aenderungen))
-        
-
-def __main__():
-    print("Dit is de Sudoko-Solver. Als je een sudoku niet kunt oplossen, hulpt je deze app uit de knel.")
-    print("Ieder sudokuspel is opgebouwt uit rijen, colommen en blokken. Om het sudokuveld te maken zijn vooraal de blokken interessant.")
-    print("Hoe breed en hoe hoog is ieder blok op jouw sudokuveld (b.v. 3 breed en 3 hoog)?")
-    breite = 3 #input("Wat is de breedte? ")
-    hoehe = 3 #input("Wat is de hoogte? ")
-    print("Okay, ieder blok is dus {0} velden breed en {1} velden hoog.".format(breite, hoehe))
-
-    sudoku_brett = __initialize_sudoku__(hoch = hoehe, breit = breite)
-
-    __test_sudoku__(sudoku_brett, hoehe, breite)
-
-    print("Er zijn {0} onbekende velden.".format(Feld.unbekannte_Felder))
-    __solve_sudoku__(sudoku_brett)
-
-    __show_sudoku__(sudoku_brett, hoehe, breite)
-
-    # __test_moeglichkeiten__(sudoku_brett, hoehe, breite)
-
-    print("Er zijn {0} onbekende velden.".format(Feld.unbekannte_Felder))
-    
-    if Feld.unbekannte_Felder == 0:
-        print("Sudoku solved!")
-    else:
-        print("Sudoku unsolved.")
-
-__main__()

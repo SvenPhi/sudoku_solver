@@ -191,9 +191,6 @@ class Puzzle:
             for row in range(max_digit):
                 for col in range(max_digit):
                     if initial_numbers[row][col] in range(1,10):
-                        print(row)
-                        print(col)
-                        print(initial_numbers[row][col])
                         self.board[row][col].set_value(initial_numbers[row][col])
             
         print('The puzzle has been set up.')
@@ -227,22 +224,60 @@ def write_down_puzzle():
           'been made the puzzle will be solved automatically.\nLife can be so'
           ' easy!\n\nPlease enter the sudoku row by row, pressing the Enter '
           'button at the end of each row. Fill in the digits you know; enter a'
-          ' 0 for all fields that are left blank in your puzzle.'))
+          ' 0 for all fields that are unknown / left blank in your puzzle.'))
     known_values = list()
+    value_row = list()
+    
+    text = input('row #1: ')
+    for w in text:
+        value_row.append(int(w))
+    known_values.append(value_row)
+    
+    for n in range(2,value_row.__len__()+1):
+        value_row = list()
+        text = input('row #{0}: '.format(n))
+        for w in text:
+            value_row.append(int(w))
+        known_values.append(value_row)
     
     return known_values
 
+
 def __main__():
     
-    sudoku_puzzle = [[0,0,1,5,0,9,4,0,2],
-                     [0,9,0,1,0,4,5,0,0],
-                     [3,5,0,0,0,8,0,9,0],
-                     [0,8,3,2,5,1,0,7,0],
-                     [0,2,9,7,0,0,3,4,0],
-                     [5,0,0,9,0,0,0,0,8],
-                     [0,0,0,0,6,0,0,5,0],
-                     [0,0,0,0,9,0,2,0,6],
-                     [0,4,2,8,0,0,0,0,7]]
+    #sudoku_puzzle = write_down_puzzle()
+    
+#    sudoku_puzzle = [[0,0,1,5,0,9,4,0,2],
+#                     [0,9,0,1,0,4,5,0,0],
+#                     [3,5,0,0,0,8,0,9,0],
+#                     [0,8,3,2,5,1,0,7,0],
+#                     [0,2,9,7,0,0,3,4,0],
+#                     [5,0,0,9,0,0,0,0,8],
+#                     [0,0,0,0,6,0,0,5,0],
+#                     [0,0,0,0,9,0,2,0,6],
+#                     [0,4,2,8,0,0,0,0,7]]
+    
+    sudoku_puzzle = [[1,0,3,8,0,5,7,0,6],
+                     [0,2,0,0,4,0,0,1,0],
+                     [7,0,0,0,0,1,0,0,9],
+                     [8,0,2,0,0,0,0,0,7],
+                     [0,6,0,0,0,0,0,9,0],
+                     [5,0,0,0,0,0,3,0,8],
+                     [6,0,0,4,0,0,0,0,5],
+                     [0,1,0,0,8,0,0,3,0],
+                     [3,0,4,6,0,7,9,0,1]]
+ 
+
+    #hard:
+#    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
+#                     [1,0,0,3,0,7,9,0,6],
+#                     [0,9,0,0,0,0,0,0,0],
+#                     [0,4,0,0,0,0,0,1,0],
+#                     [7,0,0,0,8,0,0,0,2],
+#                     [0,5,0,0,0,0,0,9,0],
+#                     [0,0,0,0,0,0,0,2,0],
+#                     [3,0,5,2,0,9,0,0,0],
+#                     [0,6,0,0,0,1,0,8,0]]
     
     super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
     super_die_hard_sudoku.__repr__()
@@ -258,80 +293,5 @@ def __main__():
 __main__()
 
 
-"""Tests:
-
-    f_val = 1
-    for grp in super_die_hard_sudoku.row_groups:
-        for f in grp.fields:
-            f.set_value(f_val)
-        f_val += 1
     
-    super_die_hard_sudoku.__repr__()    
     
-"""
-
-#======= Here starts the uselsss, old code==============================
-
-
-
-    #Sudoku 1
-    # Spielbrett.aender_feld(1,1,1)
-    # Spielbrett.aender_feld(1,3,3)
-    # Spielbrett.aender_feld(1,4,8)
-    # Spielbrett.aender_feld(1,6,5)
-    # Spielbrett.aender_feld(1,7,7)
-    # Spielbrett.aender_feld(1,9,6)
-    # Spielbrett.aender_feld(2,2,2)
-    # Spielbrett.aender_feld(2,5,4)
-    # Spielbrett.aender_feld(2,8,1)
-    # Spielbrett.aender_feld(3,1,7)
-    # Spielbrett.aender_feld(3,6,1)
-    # Spielbrett.aender_feld(3,9,9)
-    # Spielbrett.aender_feld(4,1,8)
-    # Spielbrett.aender_feld(4,3,2)
-    # Spielbrett.aender_feld(4,9,7)
-    # Spielbrett.aender_feld(5,2,6)
-    # Spielbrett.aender_feld(5,8,9)
-    # Spielbrett.aender_feld(6,1,5)
-    # Spielbrett.aender_feld(6,7,3)
-    # Spielbrett.aender_feld(6,9,8)
-    # Spielbrett.aender_feld(7,1,6)
-    # Spielbrett.aender_feld(7,4,4)
-    # Spielbrett.aender_feld(7,9,5)
-    # Spielbrett.aender_feld(8,2,1)
-    # Spielbrett.aender_feld(8,5,8)
-    # Spielbrett.aender_feld(8,8,3)
-    # Spielbrett.aender_feld(9,1,3)
-    # Spielbrett.aender_feld(9,3,4)
-    # Spielbrett.aender_feld(9,4,6)
-    # Spielbrett.aender_feld(9,6,7)
-    # Spielbrett.aender_feld(9,7,9)
-    # Spielbrett.aender_feld(9,9,1)
-
-    # Sudoku 2:
-    Spielbrett.aender_feld(1,2,7)
-    Spielbrett.aender_feld(1,5,4)
-    Spielbrett.aender_feld(1,8,5)
-    Spielbrett.aender_feld(2,1,1)
-    Spielbrett.aender_feld(2,4,3)
-    Spielbrett.aender_feld(2,6,7)
-    Spielbrett.aender_feld(2,7,9)
-    Spielbrett.aender_feld(2,9,6)
-    Spielbrett.aender_feld(3,2,9)
-    Spielbrett.aender_feld(4,2,4)
-    Spielbrett.aender_feld(4,8,1)
-    Spielbrett.aender_feld(5,1,7)
-    Spielbrett.aender_feld(5,5,8)
-    Spielbrett.aender_feld(5,9,2)
-    Spielbrett.aender_feld(6,2,5)
-    Spielbrett.aender_feld(6,8,9)
-    Spielbrett.aender_feld(7,8,2)
-    Spielbrett.aender_feld(8,1,3)
-    Spielbrett.aender_feld(8,3,5)
-    Spielbrett.aender_feld(8,4,2)
-    Spielbrett.aender_feld(8,6,9)
-    Spielbrett.aender_feld(8,9,1)
-    Spielbrett.aender_feld(9,2,6)
-    Spielbrett.aender_feld(9,5,1)
-    Spielbrett.aender_feld(9,8,8)
-

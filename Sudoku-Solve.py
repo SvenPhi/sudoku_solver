@@ -71,6 +71,13 @@ class Field:
             self.solved = True
             operations = 1 #omdat 1 actie is uitgevoerd
             
+            #let all groups know that the values has been solved
+            for grp in self.groups:
+                if grp.unknown_values.count(self.digit) == 0:
+                    print('Error, the value {0} has been set twice!'.format(self.digit))
+                else:
+                    grp.unknown_values.remove(self.digit)
+            
             #and check for the consequences in the rest of the group.
             operations += self.check_in_groups()
 
@@ -107,11 +114,15 @@ class Group:
     def __init__(self, group_fields, max_digit):
         """The argument group_fields is a list of fields that belong to the
         group."""
+        #The list of fields of which the group is comprised.
         self.fields = group_fields
         for f in self.fields:
             f.add_group(self)
+            
+        #The list with all values that are unknown within the group.
+        self.unknown_values = list()
         
-    def __repr__():
+    def __repr__(self):
         print('The fields are:')
         for f in self.fields:
             f.__repr__()
@@ -157,6 +168,15 @@ class Group:
                     elif siblings.__len__() > n: #otherwise it's an error.
                         print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
         return operations
+
+    def powerset(self):
+        ps = set()
+        for i in range(2**len(self.unknown_values)):
+            subset = tuple([x for j,x in enumerate(s) if (i >> j) & 1])
+            powerset.add(subset)
+        return powerset
+
+
                 
 
 class Puzzle:
@@ -241,7 +261,19 @@ class Puzzle:
                         output_str += ')\n'
             print(output_str)
                 
-        
+    
+    def export_board(self):
+        """This method enables to export the sudoku board to another instance
+        of the Puzzle class."""
+        board_values = list()
+        for row_of_fields in self.board:
+            row_values = list()
+            for f in row_of_fields:
+                row_values.append(f.digit)
+            board_values.append(row_values)
+        return board_values
+    
+    
     def solve(self):
         """The method solve() initiates the next iteration of the solution of
         the puzzle."""
@@ -358,6 +390,10 @@ def __main__():
     else:
         print('The puzzle has not been solved. What a sad day...')
         
+    easy_peasy = Puzzle(initial_numbers = super_die_hard_sudoku.export_board())
+    
+    easy_peasy.__repr__()
+    
 __main__()
 
 

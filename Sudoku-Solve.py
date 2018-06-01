@@ -120,12 +120,18 @@ class Group:
             f.add_group(self)
             
         #The list with all values that are unknown within the group.
-        self.unknown_values = list()
+        self.unknown_values = [x for x in range(1, max_digit + 1)]
+        self.max_digit = max_digit
         
     def __repr__(self):
         print('The fields are:')
         for f in self.fields:
             f.__repr__()
+        prt_str = "The subsets of unknown values are ["
+        for p in self.subsets_of_unknown():
+            prt_str += "{0}, ".format(p)
+        prt_str += "]."
+        print(prt_str)
     
     def check_known_values(self, field_to_chk = None):
         """The method check_known_values looks for fields that are known and
@@ -149,7 +155,6 @@ class Group:
         """This method is the generalization of the naked twins method: If
         there are n fields that can take exclusively only n of the same values,
         than all other fields cannot take these values."""
-        print('Try naked siblings...')
         operations = 0
         
         for n in range (2,5): #1 is the trivial case, higher than 4 is equivalent to cases with lower n.
@@ -169,12 +174,17 @@ class Group:
                         print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
         return operations
 
-    def powerset(self):
+    def subsets_of_unknown(self):
+        """This method returns a powerset of the set of unknown values. The
+        powerset is restricted to the sets relevant for the soulmates method,
+        which requires only sets of length between 1 and 4 or 3 (depending on
+        the max-digit of 9 or 6 respectively)."""
         ps = set()
         for i in range(2**len(self.unknown_values)):
-            subset = tuple([x for j,x in enumerate(s) if (i >> j) & 1])
-            powerset.add(subset)
-        return powerset
+            subset = tuple([x for (j,x) in enumerate(self.unknown_values) if (i >> j) & 1])
+            if (subset.__len__() > 0) and (subset.__len__() < self.max_digit / 2): 
+                ps.add(subset)
+        return ps
 
 
                 
@@ -236,7 +246,7 @@ class Puzzle:
         print('The puzzle has been set up.')
 
 
-    def __repr__(self, missing = False):
+    def __repr__(self, missing = False, groups = False):
         for rows in range(self.board.__len__()):
             if rows % 3 == 0:
                 print('=====================================')
@@ -260,6 +270,10 @@ class Puzzle:
                             output_str += '{0}, '.format(p)
                         output_str += ')\n'
             print(output_str)
+        
+        if groups:
+            for grp in self.groups:
+                grp.__repr__()
                 
     
     def export_board(self):
@@ -380,19 +394,19 @@ def __main__():
         operations = super_die_hard_sudoku.solve()
         print('{0} operations performed'.format(operations))
     
-    if not super_die_hard_sudoku.check_solved():
+#    if not super_die_hard_sudoku.check_solved():
         super_die_hard_sudoku.brute_force()
     
-    super_die_hard_sudoku.__repr__(missing = True)
+    super_die_hard_sudoku.__repr__(groups = True)
     
     if super_die_hard_sudoku.check_solved():
         print('The puzzle has been solved!')
     else:
         print('The puzzle has not been solved. What a sad day...')
-        
-    easy_peasy = Puzzle(initial_numbers = super_die_hard_sudoku.export_board())
-    
-    easy_peasy.__repr__()
+#        
+#    easy_peasy = Puzzle(initial_numbers = super_die_hard_sudoku.export_board())
+#    
+#    easy_peasy.__repr__()
     
 __main__()
 

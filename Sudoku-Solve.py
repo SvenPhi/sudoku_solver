@@ -69,17 +69,20 @@ class Field:
             #If there is only one possibility left, than set this one as value,
             self.digit = self.possibilities.pop() #returns the last value of the list and empties the list
             self.solved = True
-            operations = 1 #omdat 1 actie is uitgevoerd
-            
+            operations = 1 #because one action has been performed
+                
             #let all groups know that the values has been solved
             for grp in self.groups:
                 if grp.unknown_values.count(self.digit) == 0:
                     print('Error, the value {0} has been set twice!'.format(self.digit))
                 else:
-                    grp.unknown_values.remove(self.digit)
-            
+                    grp.check_known_values(field_to_chk = self)
+                    #grp.unknown_values.remove(self.digit)
+                    if grp.unknown_values.__len__() == 0: #then the group has been solved completely
+                        grp.unsolved = False
+                        
             #and check for the consequences in the rest of the group.
-            operations += self.check_in_groups()
+            #operations += self.check_in_groups()
 
             return operations 
         else:
@@ -121,9 +124,7 @@ class Group:
             
         #The list with all values that are unknown within the group.
         self.unknown_values = [x for x in range(1, max_digit + 1)]
-        #This restrsicts the number of sets of the unknown values to the
-        #relevant sets.
-        self.length_subsets_of_unknown = int(max_digit/2)
+        self.unsolved = True #this is set False, when the group is solved.
         
     def __repr__(self):
         print('The fields are:')
@@ -141,15 +142,21 @@ class Group:
         fields in the group."""
         operations = 0
         
-        if field_to_chk is None:
-            for f_s in self.fields: #Check for every field
-                if f_s.solved: #whether the field is known
-                    for f_u in self.fields:
-                        operations += f_u.remove_possibility(f_s.digit)
-        else: #field is given
-            if field_to_chk.solved:
-                for f_u in self.fields:
-                    operations += f_u.remove_possibility(field_to_chk.digit)
+        if self.unsolved:
+            if field_to_chk is None:
+                for f_s in self.fields: #Check for every field
+                    if f_s.solved: #whether the field is known
+                        if self.unknown_values.count(f_s.digit) > 0:
+                            self.unknown_values.remove(f_s.digit)
+                        for f_u in self.fields:
+                            operations += f_u.remove_possibility(f_s.digit)
+            else: #field is given
+                if field_to_chk.solved:
+                    if self.unknown_values.count(field_to_chk.digit) > 0:
+                        self.unknown_values.remove(field_to_chk.digit) #Remove the field from the possibilities, and...
+                    for f_u in self.fields: #from the possibilities of all fields in the group.
+                        if not f_u.solved:
+                            operations += f_u.remove_possibility(field_to_chk.digit)
         
         return operations
         
@@ -159,21 +166,24 @@ class Group:
         than all other fields cannot take these values."""
         operations = 0
         
-        for n in range (2,5): #1 is the trivial case, higher than 4 is equivalent to cases with lower n.
-            for f in self.fields:
-                if f.possibilities.__len__() == n: #Look for fields with exactly n possible values.
-                    siblings = [f]
-                    for f_other in self.fields: #If the fields differ, but their possibilities are the same, than these are siblings.
-                        if (f_other != f) and (f_other.possibilities == f.possibilities):
-                            siblings.append(f_other)
-                
-                    if siblings.__len__() == n: #check whether it's really n,
-                        for f_rest in self.fields:
-                            if f_rest not in siblings:
-                                for p in f.possibilities:
-                                    operations += f_rest.remove_possibility(p)
-                    elif siblings.__len__() > n: #otherwise it's an error.
-                        print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
+        if self.unsolved:
+            for n in range (2,5): #1 is the trivial case, higher than 4 is equivalent to cases with lower n.
+                for f in self.fields:
+                    if f.possibilities.__len__() == n: #Look for fields with exactly n possible values.
+                        siblings = [f]
+                        for f_other in self.fields: #If the fields differ, but their possibilities are the same, than these are siblings.
+                            if (f_other != f) and (f_other.possibilities == f.possibilities):
+                                siblings.append(f_other)
+                    
+                        if siblings.__len__() == n: #check whether it's really n,
+                            for f_rest in self.fields:
+                                if f_rest not in siblings:
+                                    for p in f.possibilities:
+                                        operations += f_rest.remove_possibility(p)
+                        elif siblings.__len__() > n: #otherwise it's an error.
+                            print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
+                    if not self.unsolved: #then it is solved and the loop can be broken
+                        break
         return operations
 
     def subsets_of_unknown(self):
@@ -184,13 +194,14 @@ class Group:
         ps = set()
         for i in range(2**len(self.unknown_values)):
             subset = tuple([x for (j,x) in enumerate(self.unknown_values) if (i >> j) & 1])
-            if (subset.__len__() > 0) and (subset.__len__() < self.length_subsets_of_unknown): 
+            if subset.__len__() > 0: #no empy set
                 ps.add(subset)
         return ps
     
     def soulmates(self):
-        """If there is a set of n numbers which numbers can only be taken on n
-        fields, than these numbers can be excluded from all other fields.
+        """If there is a set of n numbers comprised of numbers that can only be
+        taken on n fields, than these numbers can be excluded from all other
+        fields.
         
         The loop through all subsets can be quite large and nasty. Since the 
         small sets are more interesting, and the big sets should only be used
@@ -198,29 +209,35 @@ class Group:
         
         operations = 0
         
-        for l in range(1, self.length_subsets_of_unknown + 1):
-            for subset in self.subsets_of_unknown():
-                if subset.__len__() == l:
-                    value_fields = set() #Here a set is used instead of a list, because a set has unique elements and this is what I need.
-                    for f in self.fields:
-                        for s in subset:
-                            if s in f.possibilities:
-                                value_fields.add(f)
-                    if value_fields.__len__() == l: #the length of the subset
-                    #then, firstly, all other fields in the group cannot have the values
-                    #in the subset. Furthermore the fields with the values in
-                    #the subset cannot have any other values. So all other
-                    #values can be removed from the possibilities.
-                        for f in self.fields:
-                            if f in value_fields:
-                                for v in f.possibilities:
-                                    if v not in subset:
-                                        operations += f.remove_possibility(v)
-                            else:
-                                for v in subset:
-                                   operations += f.remove_possibility(v)
+        for l in range(1, self.unknown_values.__len__() + 1):
+            if self.unsolved:
+                for subset in self.subsets_of_unknown():
+                    if (subset.__len__() == l) and self.unsolved:
+                        value_fields = set() #Here a set is used instead of a list, because a set has unique elements and this is what I need.
+                        for f in self.fields: #For each field, this loop checks whether the subset values are part of the field's possible values.
+                            for s in subset:
+                                if s in f.possibilities:
+                                    value_fields.add(f) # If the subset value is in the possible values, the field is added to the set.
+                        if value_fields.__len__() == l: #the length of the subset
+                        #then, firstly, all other fields in the group cannot have the values
+                        #in the subset. Furthermore the fields with the values in
+                        #the subset cannot have any other values. So all other
+                        #values can be removed from the possibilities.
+                            for f in self.fields:
+                                if f in value_fields:
+                                    for v in f.possibilities:
+                                        if v not in subset:
+                                            operations += f.remove_possibility(v)
+                                else:
+                                    for v in subset:
+                                       operations += f.remove_possibility(v)
+                    elif not self.unsolved:
+                        break
+            else:
+                break
         return operations
                       
+
 class Puzzle:
     """This class defines the board on which the sudoku is played. Two versions
     of the board can be played: the standard version with 9 digits and the easy
@@ -238,6 +255,7 @@ class Puzzle:
         
         if initial_numbers is not None: #Determine the size of the board.
             max_digit = int(initial_numbers.__len__())
+         
         
         if max_digit in (6,9):
             #Define the fields
@@ -336,10 +354,10 @@ class Puzzle:
             for grp in self.groups:
                 operations += grp.naked_siblings()
                 
-#        if operations == 0:
-#            for grp in self.groups:
-#                operations += grp.soulmates()
-#                
+        if operations == 0:
+            for grp in self.groups:
+                operations += grp.soulmates()
+                
         return operations
 
     def check_solved(self):
@@ -425,7 +443,7 @@ def __main__():
 #                     [3,0,5,2,0,9,0,0,0],
 #                     [0,6,0,0,0,1,0,8,0]]
     
-    sudoku_puzzle  = puzzle_library.select_puzzle(4)
+    sudoku_puzzle  = puzzle_library.select_puzzle(14)
     super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
     super_die_hard_sudoku.__repr__()
 

@@ -121,7 +121,9 @@ class Group:
             
         #The list with all values that are unknown within the group.
         self.unknown_values = [x for x in range(1, max_digit + 1)]
-        self.max_digit = max_digit
+        #This restrsicts the number of sets of the unknown values to the
+        #relevant sets.
+        self.length_subsets_of_unknown = int(max_digit/2)
         
     def __repr__(self):
         print('The fields are:')
@@ -182,13 +184,43 @@ class Group:
         ps = set()
         for i in range(2**len(self.unknown_values)):
             subset = tuple([x for (j,x) in enumerate(self.unknown_values) if (i >> j) & 1])
-            if (subset.__len__() > 0) and (subset.__len__() < self.max_digit / 2): 
+            if (subset.__len__() > 0) and (subset.__len__() < self.length_subsets_of_unknown): 
                 ps.add(subset)
         return ps
-
-
-                
-
+    
+    def soulmates(self):
+        """If there is a set of n numbers which numbers can only be taken on n
+        fields, than these numbers can be excluded from all other fields.
+        
+        The loop through all subsets can be quite large and nasty. Since the 
+        small sets are more interesting, and the big sets should only be used
+        later, the first for-loop restricts the length of the subsets."""
+        
+        operations = 0
+        
+        for l in range(1, self.length_subsets_of_unknown + 1):
+            for subset in self.subsets_of_unknown():
+                if subset.__len__() == l:
+                    value_fields = set() #Here a set is used instead of a list, because a set has unique elements and this is what I need.
+                    for f in self.fields:
+                        for s in subset:
+                            if s in f.possibilities:
+                                value_fields.add(f)
+                    if value_fields.__len__() == l: #the length of the subset
+                    #then, firstly, all other fields in the group cannot have the values
+                    #in the subset. Furthermore the fields with the values in
+                    #the subset cannot have any other values. So all other
+                    #values can be removed from the possibilities.
+                        for f in self.fields:
+                            if f in value_fields:
+                                for v in f.possibilities:
+                                    if v not in subset:
+                                        operations += f.remove_possibility(v)
+                            else:
+                                for v in subset:
+                                   operations += f.remove_possibility(v)
+        return operations
+                      
 class Puzzle:
     """This class defines the board on which the sudoku is played. Two versions
     of the board can be played: the standard version with 9 digits and the easy
@@ -254,7 +286,10 @@ class Puzzle:
                 print('-------------------------------------')
             print_str = '|'
             for fields in self.board[rows]:
-                print_str += ' {0} |'.format(fields.digit)
+                if fields.digit != 0:
+                    print_str += ' {0} |'.format(fields.digit)
+                else:
+                    print_str += '   |'
             print(print_str)
         print('=====================================')
         
@@ -301,6 +336,10 @@ class Puzzle:
             for grp in self.groups:
                 operations += grp.naked_siblings()
                 
+#        if operations == 0:
+#            for grp in self.groups:
+#                operations += grp.soulmates()
+#                
         return operations
 
     def check_solved(self):
@@ -350,6 +389,7 @@ def write_down_puzzle():
 
 
 def __main__():
+    import puzzle_library
     
     #sudoku_puzzle = write_down_puzzle()
     
@@ -375,16 +415,17 @@ def __main__():
  
 
     #hard:
-    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
-                     [1,0,0,3,0,7,9,0,6],
-                     [0,9,0,0,0,0,0,0,0],
-                     [0,4,0,0,0,0,0,1,0],
-                     [7,0,0,0,8,0,0,0,2],
-                     [0,5,0,0,0,0,0,9,0],
-                     [0,0,0,0,0,0,0,2,0],
-                     [3,0,5,2,0,9,0,0,0],
-                     [0,6,0,0,0,1,0,8,0]]
+#    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
+#                     [1,0,0,3,0,7,9,0,6],
+#                     [0,9,0,0,0,0,0,0,0],
+#                     [0,4,0,0,0,0,0,1,0],
+#                     [7,0,0,0,8,0,0,0,2],
+#                     [0,5,0,0,0,0,0,9,0],
+#                     [0,0,0,0,0,0,0,2,0],
+#                     [3,0,5,2,0,9,0,0,0],
+#                     [0,6,0,0,0,1,0,8,0]]
     
+    sudoku_puzzle  = puzzle_library.select_puzzle(4)
     super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
     super_die_hard_sudoku.__repr__()
 
@@ -395,9 +436,9 @@ def __main__():
         print('{0} operations performed'.format(operations))
     
 #    if not super_die_hard_sudoku.check_solved():
-        super_die_hard_sudoku.brute_force()
+   #     super_die_hard_sudoku.brute_force()
     
-    super_die_hard_sudoku.__repr__(groups = True)
+    super_die_hard_sudoku.__repr__()
     
     if super_die_hard_sudoku.check_solved():
         print('The puzzle has been solved!')

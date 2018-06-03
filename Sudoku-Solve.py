@@ -126,6 +126,7 @@ class Group:
         self.unknown_values = [x for x in range(1, max_digit + 1)]
         self.unsolved = True #this is set False, when the group is solved.
         
+        
     def __repr__(self):
         print('The fields are:')
         for f in self.fields:
@@ -135,7 +136,16 @@ class Group:
             prt_str += "{0}, ".format(p)
         prt_str += "]."
         print(prt_str)
-    
+        
+        
+    def get_to_know_value(self, digit):
+        """This method sets a value to known for the group"""
+        if (self.unknown_values.count(digit) > 0) and self.unsolved:
+            self.unknown_values.remove(digit)
+            if self.unknown_values.__len__() == 0:
+                self.unsolved = False
+                
+                
     def check_known_values(self, field_to_chk = None):
         """The method check_known_values looks for fields that are known and
         deletes these known digits from the possible digits of all other
@@ -146,18 +156,27 @@ class Group:
             if field_to_chk is None:
                 for f_s in self.fields: #Check for every field
                     if f_s.solved: #whether the field is known
-                        if self.unknown_values.count(f_s.digit) > 0:
-                            self.unknown_values.remove(f_s.digit)
+                        self.get_to_know_value(f_s.digit)
                         for f_u in self.fields:
                             operations += f_u.remove_possibility(f_s.digit)
+                    else:
+                        for v in f_s.possibilities: #If v is in the possible values of the field,
+                            if v not in self.unknown_values: #but not in the possible values of the group
+                                operations += f_s.remove_possibility(v) #then remove it form the possible values of the field. 
             else: #field is given
                 if field_to_chk.solved:
-                    if self.unknown_values.count(field_to_chk.digit) > 0:
-                        self.unknown_values.remove(field_to_chk.digit) #Remove the field from the possibilities, and...
+                    self.get_to_know_value(field_to_chk.digit)
                     for f_u in self.fields: #from the possibilities of all fields in the group.
                         if not f_u.solved:
                             operations += f_u.remove_possibility(field_to_chk.digit)
-        
+            
+            #And a check whether a field still believes that a value is possible
+            #that actually is not:
+            for f in self.fields:
+                if not f.solved:
+                    for p in f.possibilities:
+                        if p not in self.unknown_values:
+                            operations += f.remove_possibility(p)
         return operations
         
     def naked_siblings(self):
@@ -167,7 +186,7 @@ class Group:
         operations = 0
         
         if self.unsolved:
-            for n in range (2,5): #1 is the trivial case, higher than 4 is equivalent to cases with lower n.
+            for n in range (2,5): #1 is the trivial case adressed in fill_check, higher than 4 is equivalent to cases with lower n.
                 for f in self.fields:
                     if f.possibilities.__len__() == n: #Look for fields with exactly n possible values.
                         siblings = [f]
@@ -219,18 +238,13 @@ class Group:
                                 if s in f.possibilities:
                                     value_fields.add(f) # If the subset value is in the possible values, the field is added to the set.
                         if value_fields.__len__() == l: #the length of the subset
-                        #then, firstly, all other fields in the group cannot have the values
-                        #in the subset. Furthermore the fields with the values in
-                        #the subset cannot have any other values. So all other
+                        #then, the fields with the values in the subset cannot
+                        #have any other values. So all other
                         #values can be removed from the possibilities.
-                            for f in self.fields:
-                                if f in value_fields:
-                                    for v in f.possibilities:
-                                        if v not in subset:
-                                            operations += f.remove_possibility(v)
-                                else:
-                                    for v in subset:
-                                       operations += f.remove_possibility(v)
+                            for f in value_fields:
+                                for v in f.possibilities:
+                                    if v not in subset:
+                                        operations += f.remove_possibility(v)
                     elif not self.unsolved:
                         break
             else:
@@ -375,8 +389,9 @@ class Puzzle:
     def brute_force(self):
         """Some puzzles are really hard. In this case we just brute force the
         solution."""
-        print('#### !!!!! BRUTE FORCE HAS BEEN APPLIED !!!!! ####')
-              
+        print("--- Und bist Du nicht willig, so brauch' ich Gewalt! ---")
+        
+        
         
 
 def write_down_puzzle():
@@ -443,7 +458,7 @@ def __main__():
 #                     [3,0,5,2,0,9,0,0,0],
 #                     [0,6,0,0,0,1,0,8,0]]
     
-    sudoku_puzzle  = puzzle_library.select_puzzle(14)
+    sudoku_puzzle  = puzzle_library.select_puzzle(4) #14 is cracked
     super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
     super_die_hard_sudoku.__repr__()
 
@@ -453,8 +468,8 @@ def __main__():
         operations = super_die_hard_sudoku.solve()
         print('{0} operations performed'.format(operations))
     
-#    if not super_die_hard_sudoku.check_solved():
-   #     super_die_hard_sudoku.brute_force()
+    if not super_die_hard_sudoku.check_solved():
+        super_die_hard_sudoku.brute_force()
     
     super_die_hard_sudoku.__repr__()
     

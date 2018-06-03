@@ -57,9 +57,12 @@ class Field:
     def set_value(self, value):
         """In case a value is known set_value() sets the field to this value
         and marks the field as a known field."""
-        self.digit = value
-        self.possibilities = list() #empty list
-        self.solved = True
+        if not self.solved:
+            self.digit = value
+            self.possibilities = list() #empty list
+            self.solved = True
+        else:
+            raise Exception("The value for this field has already been set.")
         
     
     def fill_check(self):
@@ -70,29 +73,35 @@ class Field:
             self.digit = self.possibilities.pop() #returns the last value of the list and empties the list
             self.solved = True
             operations = 1 #because one action has been performed
-                
-            #let all groups know that the values has been solved
-            for grp in self.groups:
-                if grp.unknown_values.count(self.digit) == 0:
-                    print('Error, the value {0} has been set twice!'.format(self.digit))
-                else:
-                    grp.check_known_values(field_to_chk = self)
-                    #grp.unknown_values.remove(self.digit)
-                    if grp.unknown_values.__len__() == 0: #then the group has been solved completely
-                        grp.unsolved = False
+            
+            #Check in all groups whether the value has already been taken by
+            #another field, ...
+            self.check_for_double_values(method_name = "fill_check", just_figured_out = True)
                         
-            #and check for the consequences in the rest of the group.
-            #operations += self.check_in_groups()
+            #... and check for the consequences in the rest of the group.
+            operations += self.check_in_groups()
 
             return operations 
         else:
             return 0
-            #raise ValueError('field-error: Inconsistency: {0} possible values and solved-bool is {1}.'.format(self.possibilities.__len__(), self.solved))
+
+    
+    def check_for_double_values(self, method_name, just_figured_out = False):
+        """This method raises an error is a value is taken twice in a group."""
+        if self.solved:
+            for grp in self.groups:
+                if just_figured_out and (self.digit not in grp.unknown_values):
+                    error_str = method_name + ": The value {0} has been concluded on twice.".format(self.digit)
+                    raise ValueError(error_str)
+                for f in grp.fields:
+                    if (f != self) and (f.digit == self.digit):
+                        error_str = method_name + ": The value {0} has been concluded on twice.".format(self.digit)
+                        raise ValueError(error_str)
     
     def remove_possibility(self, value):
         """This method removes a value from the possibilities and checks whether
         the field can filled in."""
-        if (not self.solved) and (self.possibilities.count(value) > 0):
+        if (not self.solved) and (value in self.possibilities):
             self.possibilities.remove(value)
             operations = self.fill_check()
             return operations + 1 #+1 for the removal of the value
@@ -150,6 +159,7 @@ class Group:
         """The method check_known_values looks for fields that are known and
         deletes these known digits from the possible digits of all other
         fields in the group."""
+        
         operations = 0
         
         if self.unsolved:
@@ -183,6 +193,7 @@ class Group:
         """This method is the generalization of the naked twins method: If
         there are n fields that can take exclusively only n of the same values,
         than all other fields cannot take these values."""
+        
         operations = 0
         
         if self.unsolved:
@@ -231,13 +242,17 @@ class Group:
         for l in range(1, self.unknown_values.__len__() + 1):
             if self.unsolved:
                 for subset in self.subsets_of_unknown():
+                    
+                    check_subset = set() #empty set to check
+                    
                     if (subset.__len__() == l) and self.unsolved:
                         value_fields = set() #Here a set is used instead of a list, because a set has unique elements and this is what I need.
                         for f in self.fields: #For each field, this loop checks whether the subset values are part of the field's possible values.
                             for s in subset:
                                 if s in f.possibilities:
                                     value_fields.add(f) # If the subset value is in the possible values, the field is added to the set.
-                        if value_fields.__len__() == l: #the length of the subset
+                                    check_subset.add(s) #Do not forget to check that all values of subset are actually in the possibilites of the fields remembered.
+                        if (value_fields.__len__() == l) and (subset == check_subset): #number of fields equals length of the subset and all subset values are required.
                         #then, the fields with the values in the subset cannot
                         #have any other values. So all other
                         #values can be removed from the possibilities.
@@ -343,6 +358,13 @@ class Puzzle:
                 grp.__repr__()
                 
     
+    def check_board_set_up(self):
+        """This method checks the setup of all values, after init."""
+        for row_of_fields in self.board:
+            for f in row_of_fields:
+                f.check_for_double_values(method_name = "check-setup")
+    
+    
     def export_board(self):
         """This method enables to export the sudoku board to another instance
         of the Puzzle class."""
@@ -372,6 +394,9 @@ class Puzzle:
             for grp in self.groups:
                 operations += grp.soulmates()
                 
+#        if operations == 0:
+#            operations += self.brute_force()
+            
         return operations
 
     def check_solved(self):
@@ -390,8 +415,21 @@ class Puzzle:
         """Some puzzles are really hard. In this case we just brute force the
         solution."""
         print("--- Und bist Du nicht willig, so brauch' ich Gewalt! ---")
+        operations = 0
         
+        #First, search for the field with the least possible values:
+        f_min = self.board[0][0]
         
+        for row_of_fields in self.board:
+            for f in row_of_fields:
+                if (not f.solved) and (f.possibilities.__len__() < f_min.possibilities.__len__()):
+                    f_min = f
+        
+        #Then make the puzzle and set the new value.
+        iter_puzzle = Puzzle()
+        #operations += iter_puzzle.solve
+        
+        return operations
         
 
 def write_down_puzzle():
@@ -458,26 +496,35 @@ def __main__():
 #                     [3,0,5,2,0,9,0,0,0],
 #                     [0,6,0,0,0,1,0,8,0]]
     
-    sudoku_puzzle  = puzzle_library.select_puzzle(4) #14 is cracked
-    super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
-    super_die_hard_sudoku.__repr__()
-
-    operations = 1
+    puzzles_solved = 0
+    puzzles_unsolved = 0
     
-    while operations > 0:
-        operations = super_die_hard_sudoku.solve()
-        print('{0} operations performed'.format(operations))
+    for puzz_num in range(0,96): #96 possible
+        
+        print("<<< Puzzle number {0}. >>>".format(puzz_num))
+        sudoku_puzzle  = puzzle_library.select_puzzle(puzz_num) #14 is cracked, 4 is not.
+        super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
+        #super_die_hard_sudoku.__repr__()
+        super_die_hard_sudoku.check_board_set_up()
+        
+        operations = 1
     
-    if not super_die_hard_sudoku.check_solved():
-        super_die_hard_sudoku.brute_force()
+        while operations > 0:
+            operations = super_die_hard_sudoku.solve()
+            print('{0} operations performed'.format(operations))
+            #super_die_hard_sudoku.__repr__(missing = False)
+#    if not super_die_hard_sudoku.check_solved():
+#        super_die_hard_sudoku.brute_force()
     
-    super_die_hard_sudoku.__repr__()
-    
-    if super_die_hard_sudoku.check_solved():
-        print('The puzzle has been solved!')
-    else:
-        print('The puzzle has not been solved. What a sad day...')
-#        
+        if super_die_hard_sudoku.check_solved():
+            #print('The puzzle has been solved!')
+            puzzles_solved += 1
+        else:
+            puzzles_unsolved += 1
+            #print('The puzzle has not been solved. What a sad day...')
+        super_die_hard_sudoku.__repr__(missing = False)
+        super_die_hard_sudoku.check_board_set_up()
+    print("{0} puzzles have been solved, {1} could not be solved.".format(puzzles_solved, puzzles_unsolved))
 #    easy_peasy = Puzzle(initial_numbers = super_die_hard_sudoku.export_board())
 #    
 #    easy_peasy.__repr__()

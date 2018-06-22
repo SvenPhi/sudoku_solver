@@ -27,10 +27,12 @@ class Field:
     It takes the argument max_digit, which is the biggest digit in the
     sudoku. Usually this is 9, but some games have only 6 digit."""
     
-    def __init__(self, max_digit = 9, known_value = 0):
+    def __init__(self, max_digit = 9, known_value = 0, row_c = -1, col_c = -1):
         self.digit = 0
         self.possibilities = [x for x in range(1, max_digit + 1)]
         self.solved = False
+        self.row = row_c
+        self.col = col_c
         #Define the group-register to which the field belongs:
         self.groups = list() 
         
@@ -39,7 +41,7 @@ class Field:
             
     def __repr__(self):
         """__repr__ shows all relevant values of the field."""
-        print('The field belongs to {0} groups:'.format(self.groups.__len__()))
+        print('The field {0}{1} belongs to {2} groups:'.format(self.row, self.col, self.groups.__len__()))
         if self.solved:
             return print('it is solved, its value is {0}.'.format(self.digit))
         else:
@@ -61,8 +63,9 @@ class Field:
             self.digit = value
             self.possibilities = list() #empty list
             self.solved = True
-        else:
-            raise Exception("The value for this field has already been set.")
+        elif self.digit != value:
+            error_str = "The value for this field has already been set as {0}. Therefore the vale {1} cannot be set.".format(self.digit, value)
+            raise ValueError(error_str)
         
     
     def fill_check(self):
@@ -90,6 +93,7 @@ class Field:
         """This method raises an error is a value is taken twice in a group."""
         if self.solved:
             for grp in self.groups:
+    
                 if just_figured_out and (self.digit not in grp.unknown_values):
                     error_str = method_name + ": The value {0} has been concluded on twice.".format(self.digit)
                     raise ValueError(error_str)
@@ -98,13 +102,19 @@ class Field:
                         error_str = method_name + ": The value {0} has been concluded on twice.".format(self.digit)
                         raise ValueError(error_str)
     
-    def remove_possibility(self, value):
+    def remove_possibility(self, value, force_removal = False):
         """This method removes a value from the possibilities and checks whether
         the field can filled in."""
         if (not self.solved) and (value in self.possibilities):
             self.possibilities.remove(value)
             operations = self.fill_check()
             return operations + 1 #+1 for the removal of the value
+        elif force_removal: #For brute-force, it has to be checked whether the fieldvalue can be removed
+            if self.solved:
+                error_str = 'The field {0}{1} is solved, no possible values can be removed.'.format(self.row, self.col)
+            else:
+                error_str = 'The value {0} is not among the possbilities of field {1}{2}.'.format(value, self.row, self.col)
+            raise ValueError(error_str)
         else:
             return 0
         
@@ -194,6 +204,8 @@ class Group:
         there are n fields that can take exclusively only n of the same values,
         than all other fields cannot take these values."""
         
+        #print("naked but sexy")
+        
         operations = 0
         
         if self.unsolved:
@@ -204,14 +216,14 @@ class Group:
                         for f_other in self.fields: #If the fields differ, but their possibilities are the same, than these are siblings.
                             if (f_other != f) and (f_other.possibilities == f.possibilities):
                                 siblings.append(f_other)
-                    
                         if siblings.__len__() == n: #check whether it's really n,
                             for f_rest in self.fields:
                                 if f_rest not in siblings:
                                     for p in f.possibilities:
                                         operations += f_rest.remove_possibility(p)
                         elif siblings.__len__() > n: #otherwise it's an error.
-                            print('Error: Too many siblings ({0}), it should be {1}.'.format(siblings.__len__(),n))                        
+                            error_str = "Too many siblings ({0}), it should be {1}.".format(siblings.__len__(),n)
+                            raise Exception(error_str)                        
                     if not self.unsolved: #then it is solved and the loop can be broken
                         break
         return operations
@@ -236,6 +248,8 @@ class Group:
         The loop through all subsets can be quite large and nasty. Since the 
         small sets are more interesting, and the big sets should only be used
         later, the first for-loop restricts the length of the subsets."""
+        
+        #print("Soul mates, go!")
         
         operations = 0
         
@@ -291,7 +305,7 @@ class Puzzle:
             for row in range(max_digit): #make the right number of rows
                 fields = list()
                 for col in range(max_digit): #for the number of columns
-                    fields.append(Field(max_digit = max_digit)) #[Field()]*9 would creat a list of the same field, therefore it is per element.
+                    fields.append(Field(max_digit = max_digit, row_c = row, col_c = col)) #[Field()]*9 would creat a list of the same field, therefore it is per element.
                 self.board.append(fields)
                 
             #Sort the fields into groups
@@ -314,7 +328,7 @@ class Puzzle:
                             block_of_fields.append(self.board[row][col])
                     self.groups.append(Group(block_of_fields, max_digit = max_digit))
         else:
-            print('Error, wrong number of digits: {0}! A sudoku game must have 6 or 9 digits.'.format(max_digit))
+            raise ValueError('Wrong number of digits: {0}! A sudoku game must have 6 or 9 digits.'.format(max_digit))
          
         if initial_numbers is not None: #Set the values known:
             for row in range(max_digit):
@@ -322,7 +336,7 @@ class Puzzle:
                     if initial_numbers[row][col] in range(1,10):
                         self.board[row][col].set_value(initial_numbers[row][col])
             
-        print('The puzzle has been set up.')
+        #print('The puzzle has been set up.')
 
 
     def __repr__(self, missing = False, groups = False):
@@ -365,39 +379,114 @@ class Puzzle:
                 f.check_for_double_values(method_name = "check-setup")
     
     
-    def export_board(self):
+    def export_board(self, field_to_adjust = None, value_to_fill_in = 0):
         """This method enables to export the sudoku board to another instance
         of the Puzzle class."""
         board_values = list()
         for row_of_fields in self.board:
             row_values = list()
             for f in row_of_fields:
-                row_values.append(f.digit)
+                if f != field_to_adjust:
+                    row_values.append(f.digit)
+                else:
+                    row_values.append(value_to_fill_in)
             board_values.append(row_values)
         return board_values
     
     
-    def solve(self):
+    def solve(self, depth_in = 0):
         """The method solve() initiates the next iteration of the solution of
         the puzzle."""
+        #print("solve-depth {0}".format(depth_in))
         
-        operations = 0
+        operations = 1
+        brute_forced = False
         
-        for grp in self.groups:
-            operations += grp.check_known_values()
+        #While there are operations and the puzzle has not been solved.
+        while (operations > 0) and (not self.check_solved()):
+            operations = 0
         
-        if operations == 0:
             for grp in self.groups:
-                operations += grp.naked_siblings()
-                
-        if operations == 0:
-            for grp in self.groups:
-                operations += grp.soulmates()
-                
-#        if operations == 0:
-#            operations += self.brute_force()
+                operations += grp.check_known_values()
             
-        return operations
+            if operations == 0:
+                for grp in self.groups:
+                    operations += grp.naked_siblings()
+                    
+            if operations == 0:
+                for grp in self.groups:
+                    operations += grp.soulmates()
+            print('{0} operations performed'.format(operations))
+            
+            
+        #The while loop has stopped, if the puzzle is still not solved, then
+        #start brute forcing it.
+        puzzle_solved = self.check_solved() #puzzle_solved will be returned
+        
+        if not puzzle_solved:
+            """Some puzzles are really hard. In this case we just brute force
+            the solution.
+        
+            The algorithm works as follows:
+                1) Search for the field with the least values, f_min.
+                2) Make a new puzzle with the same values as the existing one
+                    and set one of f_min's possible values as if it was a
+                    correct value.
+                3) Try to solve the puzzle. If
+                    (a) the puzzle is solved, than return all its values.
+                    (b) an error is returned, remove the value that has just been set
+                        and try the next possible value.
+                    (c) the puzzle goes dead, then do another brute force attemp."""
+            
+            print("--- Und bist Du nicht willig, so brauch' ich Gewalt! ---")
+        
+            #First, search for the field with the least possible values:
+            f_min = None
+            
+            for row_of_fields in self.board:
+                for f in row_of_fields:
+                    if (f_min == None) and (not f.solved):
+                        f_min = f
+                    elif (not f.solved) and (f.possibilities.__len__() < f_min.possibilities.__len__()):
+                        f_min = f
+        
+            possible_values = f_min.possibilities[:]
+            #wait_for_input = input("brute force will start")
+            #We want the values of the list, therefore [:], because we want to
+            #check whether any possible value van be correct. This is especially
+            #important if brute-force is applied recursively. Then it is the usual
+            #case that a wrong choice in an earlier recursion makes all later
+            #values wrong.
+        
+            while (possible_values.__len__() > 0) and not puzzle_solved:
+                
+                try:
+                    #Export the values form the current board and set up a new game with one extra value filled in:
+                    board_values = self.export_board() 
+                    iter_puzzle = Puzzle(initial_numbers = self.export_board(field_to_adjust = f_min, value_to_fill_in = possible_values.pop()))
+            
+                    [puzzle_solved, board_values] = iter_puzzle.solve(depth_in = depth_in + 1)
+            
+                    #If the puzzle has been solved take all the values. Be happy.
+                    if puzzle_solved:
+                        for row in range(board_values.__len__()):
+                            for col in range(board_values.__len__()):
+                                self.board[row][col].set_value(board_values[row][col])
+                        
+                    else: #If the puzzle has not been solved, do not use the returned values.
+                        board_values = self.export_board()
+                    
+                except:
+                    if (possible_values.__len__() == 0) and not self.check_solved():
+                        error_str = ("All values are wrong, wrong choice in an "
+                                     "earlier step.")
+                        raise ValueError(error_str)
+            
+        else: #If the puzzle has been solved, than export the board values.
+            board_values = self.export_board()
+            
+        return [puzzle_solved, board_values]
+
 
     def check_solved(self):
         """This method checks whether the sudoku has been solved."""
@@ -410,31 +499,12 @@ class Puzzle:
                     break
                     break
         return puzzle_solved
-    
-    def brute_force(self):
-        """Some puzzles are really hard. In this case we just brute force the
-        solution."""
-        print("--- Und bist Du nicht willig, so brauch' ich Gewalt! ---")
-        operations = 0
-        
-        #First, search for the field with the least possible values:
-        f_min = self.board[0][0]
-        
-        for row_of_fields in self.board:
-            for f in row_of_fields:
-                if (not f.solved) and (f.possibilities.__len__() < f_min.possibilities.__len__()):
-                    f_min = f
-        
-        #Then make the puzzle and set the new value.
-        iter_puzzle = Puzzle()
-        #operations += iter_puzzle.solve
-        
-        return operations
         
 
 def write_down_puzzle():
     """This function ask to fill in a sudoku and is returning the input as list
-    of n lists with n elements each. n is either 6 or 9, depending on the
+    of n lists w
+    ith n elements each. n is either 6 or 9, depending on the
     sudoku at hand."""
     print(('This function allows to fill in a sudoku easily. After your has '
           'been made the puzzle will be solved automatically.\nLife can be so'
@@ -485,52 +555,32 @@ def __main__():
 #                     [3,0,4,6,0,7,9,0,1]]
  
 
-    #hard:
-#    sudoku_puzzle = [[0,7,0,0,4,0,0,5,0],
-#                     [1,0,0,3,0,7,9,0,6],
-#                     [0,9,0,0,0,0,0,0,0],
-#                     [0,4,0,0,0,0,0,1,0],
-#                     [7,0,0,0,8,0,0,0,2],
-#                     [0,5,0,0,0,0,0,9,0],
-#                     [0,0,0,0,0,0,0,2,0],
-#                     [3,0,5,2,0,9,0,0,0],
-#                     [0,6,0,0,0,1,0,8,0]]
     
     puzzles_solved = 0
     puzzles_unsolved = 0
     
-    for puzz_num in range(0,96): #96 possible
+    for puzz_num in range(0,1): #96 possible
         
         print("<<< Puzzle number {0}. >>>".format(puzz_num))
-        sudoku_puzzle  = puzzle_library.select_puzzle(puzz_num) #14 is cracked, 4 is not.
+        sudoku_puzzle = puzzle_library.select_puzzle(puzz_num) #14 is cracked, 4 is not.
+             
         super_die_hard_sudoku = Puzzle(initial_numbers = sudoku_puzzle)
         #super_die_hard_sudoku.__repr__()
         super_die_hard_sudoku.check_board_set_up()
         
-        operations = 1
-    
-        while operations > 0:
-            operations = super_die_hard_sudoku.solve()
-            print('{0} operations performed'.format(operations))
-            #super_die_hard_sudoku.__repr__(missing = False)
-#    if not super_die_hard_sudoku.check_solved():
-#        super_die_hard_sudoku.brute_force()
-    
-        if super_die_hard_sudoku.check_solved():
-            #print('The puzzle has been solved!')
-            puzzles_solved += 1
-        else:
+        [brutely_forced,board_values] = super_die_hard_sudoku.solve()
+
+        if brutely_forced:
             puzzles_unsolved += 1
-            #print('The puzzle has not been solved. What a sad day...')
+        else:
+            puzzles_solved += 1
+
         super_die_hard_sudoku.__repr__(missing = False)
         super_die_hard_sudoku.check_board_set_up()
-    print("{0} puzzles have been solved, {1} could not be solved.".format(puzzles_solved, puzzles_unsolved))
-#    easy_peasy = Puzzle(initial_numbers = super_die_hard_sudoku.export_board())
-#    
-#    easy_peasy.__repr__()
+    print("{0} puzzles have been solved with logic only, {1} have been solved using brute force.".format(puzzles_solved, puzzles_unsolved))
     
 __main__()
 
 
     
-    
+ 
